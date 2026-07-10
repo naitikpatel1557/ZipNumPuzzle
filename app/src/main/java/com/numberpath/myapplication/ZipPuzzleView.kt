@@ -16,44 +16,38 @@ import kotlin.math.min
 class ZipPuzzleView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
 
     // --- Configuration ---
-    // Change this to 8 if you want an 8x8 grid!
-    private val gridSize = 5
-    private var cellSize = 0f
+    private var gridSize = 5
+    var currentDifficulty = "EASY"
 
-    private var currentMaxNodes = 5 // Highest number to connect (1 to 4)
+    private var cellSize = 0f
+    private var currentMaxNodes = 5
 
     // --- State Management ---
     private var targetNodes = listOf<Node>()
     private val currentPath = mutableListOf<Pair<Int, Int>>()
-
-    // Saves the absolute correct solution for the current level
     private var masterSolutionPath = listOf<Pair<Int, Int>>()
 
-    // Callback to notify the Activity that the level is cleared
     var onLevelCleared: (() -> Unit)? = null
-
-    // Reusable path to prevent memory warnings in onDraw
     private val drawPath = Path()
-
     val walls = mutableListOf<Wall>()
 
-    // --- Paint Objects (Styling) ---
+    // --- Paint Objects ---
     private val wallPaint = Paint().apply {
         color = Color.BLACK
-        strokeWidth = 24f // Thick, bold lines
-        strokeCap = Paint.Cap.ROUND // Gives the walls those nice rounded ends!
+        strokeWidth = 24f
+        strokeCap = Paint.Cap.ROUND
         style = Paint.Style.STROKE
     }
 
     private val gridPaint = Paint().apply {
-        color = "#E0E0E0".toColorInt() // Light gray for the grid
+        color = "#E0E0E0".toColorInt()
         style = Paint.Style.STROKE
         strokeWidth = 5f
         isAntiAlias = true
     }
 
     private val pathPaint = Paint().apply {
-        color = "#E91E63".toColorInt() // The pink path color
+        color = "#E91E63".toColorInt()
         style = Paint.Style.STROKE
         strokeWidth = 60f
         strokeJoin = Paint.Join.ROUND
@@ -78,33 +72,48 @@ class ZipPuzzleView(context: Context, attrs: AttributeSet?) : View(context, attr
         generateRandomLevel()
     }
 
-    // --- Calculation ---
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         cellSize = (min(w, h) / gridSize).toFloat()
     }
 
-    // --- Level Generation (Solvable Path Algorithm) ---
-    // --- Level Generation (Solvable Path Algorithm) ---
     private fun generateRandomLevel() {
         walls.clear()
 
+        // RESTORED: We now require 100% of the grid to be filled (Total Cells)
         val totalCells = gridSize * gridSize
 
-        // Increase node count for larger grids to match your Hard mode image
-        currentMaxNodes = if (gridSize >= 6) (10..16).random() else (5..10).random()
+        val numberOfWalls: Int
+        when (currentDifficulty) {
+            "EASY" -> {
+                currentMaxNodes = (5..7).random()
+                numberOfWalls = ((gridSize * 1.0).toInt()..(gridSize * 1.5).toInt()).random()
+            }
+            "MEDIUM" -> {
+                currentMaxNodes = (7..10).random()
+                numberOfWalls = ((gridSize * 2.0).toInt()..(gridSize * 2.5).toInt()).random()
+            }
+            "HARD" -> {
+                currentMaxNodes = (10..16).random()
+                numberOfWalls = ((gridSize * 2.5).toInt()..(gridSize * 3.0).toInt()).random()
+            }
+            else -> {
+                currentMaxNodes = 5
+                numberOfWalls = 5
+            }
+        }
 
         val hiddenPath = mutableListOf<Pair<Int, Int>>()
         var successfullyGenerated = false
 
-        // Loop until a valid path is found quickly
         while (!successfullyGenerated) {
             hiddenPath.clear()
             val visited = Array(gridSize) { BooleanArray(gridSize) }
             val dirs = arrayOf(Pair(0, -1), Pair(0, 1), Pair(-1, 0), Pair(1, 0))
-
             var iterations = 0
-            val maxIterations = 5000 // Safety kill-switch
+
+            // Increased iteration depth to help 8x8 grids find a path faster
+            val maxIterations = 50000
 
             fun findFullPath(currentX: Int, currentY: Int): Boolean {
                 iterations++
@@ -113,6 +122,7 @@ class ZipPuzzleView(context: Context, attrs: AttributeSet?) : View(context, attr
                 hiddenPath.add(Pair(currentX, currentY))
                 visited[currentX][currentY] = true
 
+                // RESTORED: Must hit every single cell on the board
                 if (hiddenPath.size == totalCells) return true
 
                 dirs.shuffle()
@@ -139,11 +149,12 @@ class ZipPuzzleView(context: Context, attrs: AttributeSet?) : View(context, attr
             successfullyGenerated = findFullPath(startX, startY)
         }
 
-        // Place the nodes sequentially along the successfully generated path
         val nodes = mutableListOf<Node>()
         nodes.add(Node(hiddenPath[0].first, hiddenPath[0].second, 1))
 
         val intermediateIndices = mutableListOf<Int>()
+
+        // RESTORED: Uses totalCells to place the final node
         val availableIndices = (1 until totalCells - 1).toMutableList()
         availableIndices.shuffle()
 
@@ -158,73 +169,57 @@ class ZipPuzzleView(context: Context, attrs: AttributeSet?) : View(context, attr
             currentNumber++
         }
 
+        // RESTORED: Final node is placed exactly at the end of the 100% path
         nodes.add(Node(hiddenPath[totalCells - 1].first, hiddenPath[totalCells - 1].second, currentMaxNodes))
 
         targetNodes = nodes
         masterSolutionPath = hiddenPath.toList()
 
-        // --- THE FIX: DYNAMIC "SAFE" WALL GENERATION ---
-
-        // 1. Collect every possible wall location on the grid
         val allPossibleWalls = mutableListOf<Wall>()
         for (x in 0 until gridSize) {
             for (y in 0 until gridSize) {
-                if (y < gridSize - 1) allPossibleWalls.add(Wall(CellPoint(x, y), CellPoint(x, y + 1))) // Horizontal walls
-                if (x < gridSize - 1) allPossibleWalls.add(Wall(CellPoint(x, y), CellPoint(x + 1, y))) // Vertical walls
+                if (y < gridSize - 1) allPossibleWalls.add(Wall(CellPoint(x, y), CellPoint(x, y + 1)))
+                if (x < gridSize - 1) allPossibleWalls.add(Wall(CellPoint(x, y), CellPoint(x + 1, y)))
             }
         }
 
-        // 2. Remove any wall that the winning pink path needs to pass through
         for (i in 0 until masterSolutionPath.size - 1) {
             val step1 = masterSolutionPath[i]
             val step2 = masterSolutionPath[i + 1]
             allPossibleWalls.removeAll { it.blocks(step1, step2) }
         }
 
-        // 3. Shuffle the remaining safe walls and add them to the board
         allPossibleWalls.shuffle()
-
-        // Determine how many walls to add based on grid size
-        val numberOfWalls = (gridSize * 2..gridSize * 3).random()
-
         for (i in 0 until kotlin.math.min(numberOfWalls, allPossibleWalls.size)) {
             walls.add(allPossibleWalls[i])
         }
     }
 
-    // --- Rendering ---
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
-        // 1. Draw the Background Grid
         for (i in 0..gridSize) {
             val position = i * cellSize
             canvas.drawLine(position, 0f, position, gridSize * cellSize, gridPaint)
             canvas.drawLine(0f, position, gridSize * cellSize, position, gridPaint)
         }
 
-        // 2. Draw the solid black walls
         for (wall in walls) {
             if (wall.c1.x == wall.c2.x) {
-                // Horizontal wall
                 val y = maxOf(wall.c1.y, wall.c2.y)
                 val startX = (wall.c1.x * cellSize) + (cellSize * 0.1f)
                 val stopX = ((wall.c1.x + 1) * cellSize) - (cellSize * 0.1f)
                 val lineY = y * cellSize
-
                 canvas.drawLine(startX, lineY, stopX, lineY, wallPaint)
             } else if (wall.c1.y == wall.c2.y) {
-                // Vertical wall
                 val x = maxOf(wall.c1.x, wall.c2.x)
                 val startY = (wall.c1.y * cellSize) + (cellSize * 0.1f)
                 val stopY = ((wall.c1.y + 1) * cellSize) - (cellSize * 0.1f)
                 val lineX = x * cellSize
-
                 canvas.drawLine(lineX, startY, lineX, stopY, wallPaint)
             }
         }
 
-        // 3. Draw the user's path (Reusing drawPath to save memory)
         if (currentPath.isNotEmpty()) {
             drawPath.reset()
             val startX = currentPath[0].first * cellSize + (cellSize / 2)
@@ -239,19 +234,15 @@ class ZipPuzzleView(context: Context, attrs: AttributeSet?) : View(context, attr
             canvas.drawPath(drawPath, pathPaint)
         }
 
-        // 4. Draw the numbered nodes
         for (node in targetNodes) {
             val cx = node.x * cellSize + (cellSize / 2)
             val cy = node.y * cellSize + (cellSize / 2)
-
             canvas.drawCircle(cx, cy, cellSize / 3, nodePaint)
-
             val textOffset = (textPaint.descent() + textPaint.ascent()) / 2
             canvas.drawText(node.number.toString(), cx, cy - textOffset, textPaint)
         }
     }
 
-    // --- Interaction ---
     override fun onTouchEvent(event: MotionEvent): Boolean {
         val gridX = (event.x / cellSize).toInt()
         val gridY = (event.y / cellSize).toInt()
@@ -262,11 +253,9 @@ class ZipPuzzleView(context: Context, attrs: AttributeSet?) : View(context, attr
             MotionEvent.ACTION_DOWN -> {
                 currentPath.clear()
                 currentPath.add(Pair(gridX, gridY))
-
                 if (targetNodes.any { it.x == gridX && it.y == gridY }) {
                     vibrateOnNumberHit()
                 }
-
                 invalidate()
             }
             MotionEvent.ACTION_MOVE -> {
@@ -278,12 +267,9 @@ class ZipPuzzleView(context: Context, attrs: AttributeSet?) : View(context, attr
                     val dy = Math.abs(lastCell.second - gridY)
 
                     if ((dx == 1 && dy == 0) || (dx == 0 && dy == 1)) {
-
                         val isBlocked = walls.any { it.blocks(lastCell, newCell) }
-
                         if (!isBlocked) {
                             currentPath.add(newCell)
-
                             if (targetNodes.any { it.x == gridX && it.y == gridY }) {
                                 vibrateOnNumberHit()
                             }
@@ -306,6 +292,7 @@ class ZipPuzzleView(context: Context, attrs: AttributeSet?) : View(context, attr
     }
 
     private fun validateGame() {
+        // RESTORED: Must strictly fill every single cell on the board to win
         val totalCells = gridSize * gridSize
 
         if (currentPath.size != totalCells) {
@@ -315,7 +302,6 @@ class ZipPuzzleView(context: Context, attrs: AttributeSet?) : View(context, attr
         var expectedNumber = 1
         for (step in currentPath) {
             val nodeAtStep = targetNodes.find { it.x == step.first && it.y == step.second }
-
             if (nodeAtStep != null) {
                 if (nodeAtStep.number == expectedNumber) {
                     expectedNumber++
@@ -324,51 +310,45 @@ class ZipPuzzleView(context: Context, attrs: AttributeSet?) : View(context, attr
                 }
             }
         }
-
         if (expectedNumber > currentMaxNodes) {
             onLevelCleared?.invoke()
         }
     }
 
-    fun startNewLevel() {
+    fun startNewLevel(mode: String) {
+        currentDifficulty = mode
+        when (mode) {
+            "EASY" -> gridSize = 5
+            "MEDIUM" -> gridSize = 6
+            "HARD" -> gridSize = 8 // Change to 7 if 8 takes too long to load!
+        }
+        if (width > 0 && height > 0) {
+            cellSize = (min(width, height) / gridSize).toFloat()
+        }
         generateRandomLevel()
         currentPath.clear()
         invalidate()
     }
 
-    // --- Hint Logic ---
     fun showHint() {
         if (masterSolutionPath.isEmpty()) return
-
         var correctSteps = 0
         while (correctSteps < currentPath.size && correctSteps < masterSolutionPath.size) {
-            if (currentPath[correctSteps] == masterSolutionPath[correctSteps]) {
-                correctSteps++
-            } else {
-                break
-            }
+            if (currentPath[correctSteps] == masterSolutionPath[correctSteps]) correctSteps++
+            else break
         }
-
         currentPath.clear()
-        for (i in 0 until correctSteps) {
-            currentPath.add(masterSolutionPath[i])
-        }
-
-        if (correctSteps < masterSolutionPath.size) {
-            currentPath.add(masterSolutionPath[correctSteps])
-        }
-
+        for (i in 0 until correctSteps) currentPath.add(masterSolutionPath[i])
+        if (correctSteps < masterSolutionPath.size) currentPath.add(masterSolutionPath[correctSteps])
         invalidate()
         validateGame()
     }
 
-    // --- Reset Logic ---
     fun resetPath() {
         currentPath.clear()
         invalidate()
     }
 
-    // --- Modern Haptic Feedback ---
     private fun vibrateOnNumberHit() {
         val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
         vibratorManager.defaultVibrator.vibrate(
@@ -376,11 +356,8 @@ class ZipPuzzleView(context: Context, attrs: AttributeSet?) : View(context, attr
         )
     }
 
-    // --- Data Classes ---
     data class Node(val x: Int, val y: Int, val number: Int)
-
     data class CellPoint(val x: Int, val y: Int)
-
     data class Wall(val c1: CellPoint, val c2: CellPoint) {
         fun blocks(swipeStart: Pair<Int, Int>, swipeEnd: Pair<Int, Int>): Boolean {
             val start = CellPoint(swipeStart.first, swipeStart.second)

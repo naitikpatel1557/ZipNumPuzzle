@@ -1,6 +1,5 @@
 package com.numberpath.myapplication
 
-
 import android.content.Context
 import android.content.SharedPreferences
 import android.os.Bundle
@@ -11,31 +10,28 @@ import android.widget.Button
 import android.widget.GridLayout
 import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import android.media.MediaPlayer
-import android.widget.SeekBar
 import android.view.Gravity
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
-
 
 class MainActivity : AppCompatActivity() {
 
     // Screens
     private lateinit var screenMainMenu: LinearLayout
+    private lateinit var screenDifficulty: LinearLayout
     private lateinit var screenLevelSelect: LinearLayout
     private lateinit var screenGame: LinearLayout
     private lateinit var screenResults: View
+
     private var backgroundMusic: MediaPlayer? = null
-
-
-    // Add this near your MediaPlayer declaration
-    private var currentMusicVolume = 0.4f // Default to 40% volume
+    private var currentMusicVolume = 0.4f
+    private var activeDifficultyMode = "EASY"
 
     // Game Elements
-    private lateinit var puzzleBoard: ZipPuzzleView // Make sure to import your custom view!
+    private lateinit var puzzleBoard: ZipPuzzleView
     private lateinit var tvTimer: TextView
     private lateinit var tvLevel: TextView
     private lateinit var levelGrid: GridLayout
@@ -43,11 +39,8 @@ class MainActivity : AppCompatActivity() {
     // Game State
     private var playingLevel = 1
     private var highestUnlockedLevel = 1
-    private val totalLevels = 1000 // Change this to however many levels you want
+    private val totalLevels = 1000
     private lateinit var prefs: SharedPreferences
-
-
-
 
     // Timer State
     private var secondsElapsed = 0
@@ -63,27 +56,19 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-
-
     override fun onCreate(savedInstanceState: Bundle?) {
-        //splash screen
         installSplashScreen()
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-
-
-        // Initialize SharedPreferences to save progress
         prefs = getSharedPreferences("ZipGamePrefs", Context.MODE_PRIVATE)
-        highestUnlockedLevel = prefs.getInt("HIGHEST_LEVEL", 1)
 
-        // Load the saved theme instantly on startup
         val savedTheme = prefs.getInt("THEME_MODE", androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
         androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES)
 
-
         // Bind Views
         screenMainMenu = findViewById(R.id.screenMainMenu)
+        screenDifficulty = findViewById(R.id.screenDifficulty)
         screenLevelSelect = findViewById(R.id.screenLevelSelect)
         screenGame = findViewById(R.id.screenGame)
         screenResults = findViewById(R.id.screenResults)
@@ -92,16 +77,9 @@ class MainActivity : AppCompatActivity() {
         tvLevel = findViewById(R.id.tvLevel)
         levelGrid = findViewById(R.id.levelGrid)
 
-
-
-        // 2. Initialize the MediaPlayer
-        // Replace 'bg_music' with whatever you named your file in the raw folder
         backgroundMusic = MediaPlayer.create(this, R.raw.bg_music)
         backgroundMusic?.isLooping = true
-
-        // Optional: Lower the volume so it doesn't overpower your haptic vibrations
         backgroundMusic?.setVolume(0.4f, 0.4f)
-
 
         // --- HOW TO PLAY TOGGLE LOGIC ---
         val header = findViewById<View>(R.id.layoutHowToPlayHeader)
@@ -110,82 +88,79 @@ class MainActivity : AppCompatActivity() {
 
         header.setOnClickListener {
             if (content.visibility == View.GONE) {
-                // Expand the card
                 content.visibility = View.VISIBLE
-                arrow.animate().rotation(270f).setDuration(200).start() // Point arrow up
+                arrow.animate().rotation(270f).setDuration(200).start()
             } else {
-                // Collapse the card
                 content.visibility = View.GONE
-                arrow.animate().rotation(90f).setDuration(200).start() // Point arrow down
+                arrow.animate().rotation(90f).setDuration(200).start()
             }
         }
 
+        // --- NAVIGATION LISTENERS ---
+        findViewById<View>(R.id.btnSettings).setOnClickListener { showSettingsDialog() }
+        findViewById<View>(R.id.btnReset).setOnClickListener { puzzleBoard.resetPath() }
+        findViewById<Button>(R.id.btnHint).setOnClickListener { puzzleBoard.showHint() }
 
-        // Settings Button Listener
-        findViewById<View>(R.id.btnSettings).setOnClickListener {
-            showSettingsDialog()
-        }
-
-        // Reset Button Listener
-        findViewById<View>(R.id.btnReset).setOnClickListener {
-            puzzleBoard.resetPath()
-        }
-
-        // Listen for the Back button click on the game screen
-        findViewById<View>(R.id.btnBackFromGame).setOnClickListener {
-            showLevelSelection()
-        }
-
-        // Set up Click Listeners for Menu
+        // Main Menu PLAY button -> Shows Difficulty Screen
         findViewById<Button>(R.id.btnPlay).setOnClickListener {
-            showLevelSelection()
+            screenMainMenu.visibility = View.GONE
+            screenDifficulty.visibility = View.VISIBLE
         }
 
-        findViewById<Button>(R.id.btnBackToMenu).setOnClickListener {
-            showMainMenu()
+        // Back button on Difficulty Screen -> Goes to Main Menu
+        findViewById<View>(R.id.btnBackFromDifficulty).setOnClickListener {
+            screenDifficulty.visibility = View.GONE
+            screenMainMenu.visibility = View.VISIBLE
         }
 
-        findViewById<Button>(R.id.btnHint).setOnClickListener {
-            puzzleBoard.showHint()
-        }
+        // Difficulty Selection Buttons
+        findViewById<View>(R.id.btnEasy).setOnClickListener { openLevelSelectForMode("EASY") }
+        findViewById<View>(R.id.btnMedium).setOnClickListener { openLevelSelectForMode("MEDIUM") }
+        findViewById<View>(R.id.btnHard).setOnClickListener { openLevelSelectForMode("HARD") }
 
-        // Listen for Win Condition
-        puzzleBoard.onLevelCleared = {
-            handleLevelWin()
-        }
+        findViewById<View>(R.id.btnBackFromGame).setOnClickListener { showLevelSelection() }
+        findViewById<Button>(R.id.btnBackToMenu).setOnClickListener { showMainMenu() }
 
-        // Build the level grid dynamically
-        buildLevelGrid()
+        puzzleBoard.onLevelCleared = { handleLevelWin() }
     }
 
     // --- SCREEN NAVIGATION ---
-
-
     private fun showMainMenu() {
         screenMainMenu.visibility = View.VISIBLE
+        screenDifficulty.visibility = View.GONE
         screenLevelSelect.visibility = View.GONE
         screenGame.visibility = View.GONE
         pauseTimer()
     }
 
+    private fun openLevelSelectForMode(mode: String) {
+        activeDifficultyMode = mode
+        highestUnlockedLevel = prefs.getInt("HIGHEST_LEVEL_$activeDifficultyMode", 1)
+
+        screenDifficulty.visibility = View.GONE
+        screenLevelSelect.visibility = View.VISIBLE
+
+        refreshLevelGrid()
+    }
+
     private fun showLevelSelection() {
         screenMainMenu.visibility = View.GONE
+        screenDifficulty.visibility = View.GONE
         screenLevelSelect.visibility = View.VISIBLE
         screenGame.visibility = View.GONE
 
-        // Rebuild grid in case they just unlocked a new level
-        buildLevelGrid()
+        refreshLevelGrid()
     }
 
     private fun startGameForLevel(level: Int) {
         playingLevel = level
         screenMainMenu.visibility = View.GONE
+        screenDifficulty.visibility = View.GONE
         screenLevelSelect.visibility = View.GONE
         screenGame.visibility = View.VISIBLE
 
         tvLevel.text = "Level $playingLevel"
-
-        puzzleBoard.startNewLevel() // Trigger your custom view to build a board
+        puzzleBoard.startNewLevel(activeDifficultyMode)
         startTimer()
     }
 
@@ -194,58 +169,42 @@ class MainActivity : AppCompatActivity() {
         levelGrid.removeAllViews()
 
         for (i in 1..totalLevels) {
-
-            // 1. Create a container for the Text and the Button
             val cellContainer = android.widget.LinearLayout(this).apply {
                 orientation = android.widget.LinearLayout.VERTICAL
                 gravity = Gravity.CENTER
-                layoutParams = GridLayout.LayoutParams().apply {
-                    setMargins(16, 16, 16, 16)
-                }
+                layoutParams = GridLayout.LayoutParams().apply { setMargins(16, 16, 16, 16) }
             }
 
-            // 2. Create the Timer Text (above the button)
             val timeText = android.widget.TextView(this).apply {
-                // Check if they have a saved time for this specific level
-                val savedTime = prefs.getInt("LEVEL_${i}_TIME", -1)
-
+                val savedTime = prefs.getInt("LEVEL_${i}_TIME_$activeDifficultyMode", -1)
                 if (savedTime != -1) {
-                    // Format the saved seconds into M:SS
                     val m = savedTime / 60
                     val s = savedTime % 60
                     text = String.format("⏱ %d:%02d", m, s)
                     setTextColor(android.graphics.Color.DKGRAY)
                 } else {
-                    text = " " // Leave a blank space so the grid stays perfectly aligned
+                    text = " "
                 }
-
                 textSize = 14f
                 setTypeface(null, android.graphics.Typeface.BOLD)
-                setPadding(0, 0, 0, 8) // Small gap between text and button
+                setPadding(0, 0, 0, 8)
                 gravity = Gravity.CENTER
             }
 
-            // 3. Create your existing Material Button
             val btn = com.google.android.material.button.MaterialButton(this).apply {
-                // Notice the size is now applied to the button's standard layout params
                 layoutParams = android.widget.LinearLayout.LayoutParams(220, 220)
-
                 cornerRadius = 32
                 insetTop = 0
                 insetBottom = 0
 
                 if (i <= highestUnlockedLevel) {
-                    // UNLOCKED
                     text = i.toString()
                     textSize = 28f
                     isEnabled = true
                     backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#E91E63"))
                     setTextColor(android.graphics.Color.WHITE)
-                    setOnClickListener {
-                        startGameForLevel(i)
-                    }
+                    setOnClickListener { startGameForLevel(i) }
                 } else {
-                    // LOCKED
                     text = "🔒"
                     textSize = 24f
                     isEnabled = false
@@ -253,16 +212,48 @@ class MainActivity : AppCompatActivity() {
                     setTextColor(android.graphics.Color.DKGRAY)
                 }
             }
-
-            // 4. Add the Text and Button to the container, then add the container to the Grid!
             cellContainer.addView(timeText)
             cellContainer.addView(btn)
             levelGrid.addView(cellContainer)
         }
     }
 
-    // --- TIMER LOGIC ---
+    private fun refreshLevelGrid() {
+        if (levelGrid.childCount == 0) {
+            buildLevelGrid()
+            return
+        }
 
+        for (i in 0 until levelGrid.childCount) {
+            val levelNumber = i + 1
+            val cellContainer = levelGrid.getChildAt(i) as android.widget.LinearLayout
+            val timeText = cellContainer.getChildAt(0) as android.widget.TextView
+            val btn = cellContainer.getChildAt(1) as com.google.android.material.button.MaterialButton
+
+            val savedTime = prefs.getInt("LEVEL_${levelNumber}_TIME_$activeDifficultyMode", -1)
+            if (savedTime != -1) {
+                val m = savedTime / 60
+                val s = savedTime % 60
+                timeText.text = String.format("⏱ %d:%02d", m, s)
+            } else {
+                timeText.text = " "
+            }
+
+            if (levelNumber <= highestUnlockedLevel) {
+                btn.text = levelNumber.toString()
+                btn.isEnabled = true
+                btn.backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#E91E63"))
+                btn.setTextColor(android.graphics.Color.WHITE)
+            } else {
+                btn.text = "🔒"
+                btn.isEnabled = false
+                btn.backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#E0E0E0"))
+                btn.setTextColor(android.graphics.Color.DKGRAY)
+            }
+        }
+    }
+
+    // --- TIMER LOGIC ---
     private fun startTimer() {
         secondsElapsed = 0
         isTimerRunning = true
@@ -282,36 +273,30 @@ class MainActivity : AppCompatActivity() {
     }
 
     // --- WIN LOGIC ---
-// --- WIN LOGIC ---
     private fun handleLevelWin() {
         pauseTimer()
 
-        // 1. Progress Unlocks
         if (playingLevel == highestUnlockedLevel) {
             highestUnlockedLevel++
-            prefs.edit().putInt("HIGHEST_LEVEL", highestUnlockedLevel).apply()
+            prefs.edit().putInt("HIGHEST_LEVEL_$activeDifficultyMode", highestUnlockedLevel).apply()
         }
 
-        // 2. Best Time Logic
-        val timeKey = "LEVEL_${playingLevel}_TIME"
+        val timeKey = "LEVEL_${playingLevel}_TIME_$activeDifficultyMode"
         var previousBestTime = prefs.getInt(timeKey, Int.MAX_VALUE)
 
         if (secondsElapsed < previousBestTime) {
             prefs.edit().putInt(timeKey, secondsElapsed).apply()
-            previousBestTime = secondsElapsed // Update variable so the UI shows the new record
+            previousBestTime = secondsElapsed
         }
 
-        // 3. Daily Streak Logic
         val today = LocalDate.now()
         val lastPlayedStr = prefs.getString("LAST_PLAYED_DATE", "")
-
         var currentStreak = prefs.getInt("CURRENT_STREAK", 0)
         var maxStreak = prefs.getInt("MAX_STREAK", 0)
         var totalPlays = prefs.getInt("TOTAL_PLAYS", 0)
 
-        totalPlays++ // Add 1 to total plays
+        totalPlays++
 
-        // Calculate if they kept the streak alive
         if (lastPlayedStr.isNullOrEmpty()) {
             currentStreak = 1
         } else {
@@ -319,17 +304,14 @@ class MainActivity : AppCompatActivity() {
             val daysBetween = ChronoUnit.DAYS.between(lastPlayed, today)
 
             if (daysBetween == 1L) {
-                currentStreak++ // Played yesterday, streak goes up!
+                currentStreak++
             } else if (daysBetween > 1L) {
-                currentStreak = 1 // Missed a day, reset to 1
+                currentStreak = 1
             }
         }
 
-        if (currentStreak > maxStreak) {
-            maxStreak = currentStreak
-        }
+        if (currentStreak > maxStreak) maxStreak = currentStreak
 
-        // Save new stats to memory
         prefs.edit()
             .putString("LAST_PLAYED_DATE", today.toString())
             .putInt("CURRENT_STREAK", currentStreak)
@@ -337,30 +319,24 @@ class MainActivity : AppCompatActivity() {
             .putInt("TOTAL_PLAYS", totalPlays)
             .apply()
 
-        // Refresh the background grid
-        buildLevelGrid()
+        refreshLevelGrid()
 
-        // 4. HIDE the game board, SHOW the new results screen
         screenGame.visibility = View.GONE
         screenResults.visibility = View.VISIBLE
 
-        // 5. Connect the Kotlin code to your new activity_result.xml layout
         val tvFinalTime = findViewById<TextView>(R.id.tvFinalTime)
         val tvZipLevelTitle = findViewById<TextView>(R.id.tvZipLevelTitle)
         val tvPlays = findViewById<TextView>(R.id.tvPlays)
         val tvBestScore = findViewById<TextView>(R.id.tvBestScore)
         val tvMaxStreak = findViewById<TextView>(R.id.tvMaxStreak)
         val tvCurrentStreakTitle = findViewById<TextView>(R.id.tvCurrentStreakTitle)
-
         val btnNextLevel = findViewById<View>(R.id.btnNextLevelFromResults)
         val btnClose = findViewById<View>(R.id.btnCloseResult)
 
-        // 6. Update the text with the real math!
         tvFinalTime.text = "Solved in ${tvTimer.text.substring(2)}"
-        tvZipLevelTitle.text = "Zip #$playingLevel"
+        tvZipLevelTitle.text = "$activeDifficultyMode #$playingLevel"
         tvPlays.text = totalPlays.toString()
 
-        // Format the best score (e.g., 0:14)
         val m = previousBestTime / 60
         val s = previousBestTime % 60
         tvBestScore.text = String.format("%d:%02d", m, s)
@@ -368,7 +344,6 @@ class MainActivity : AppCompatActivity() {
         tvMaxStreak.text = maxStreak.toString()
         tvCurrentStreakTitle.text = "$currentStreak-day win streak 🔥"
 
-        // 7. Setup Buttons
         btnNextLevel.setOnClickListener {
             screenResults.visibility = View.GONE
             startGameForLevel(playingLevel + 1)
@@ -388,7 +363,6 @@ class MainActivity : AppCompatActivity() {
 
         var settingsDialog: androidx.appcompat.app.AlertDialog? = null
 
-        // 1. Volume Section
         val volumeTitle = android.widget.TextView(this).apply {
             text = "Music Volume"
             textSize = 16f
@@ -398,7 +372,7 @@ class MainActivity : AppCompatActivity() {
         val seekBar = android.widget.SeekBar(this).apply {
             max = 100
             progress = (currentMusicVolume * 100).toInt()
-            setPadding(0, 0, 0, 48) // Extra padding below the slider
+            setPadding(0, 0, 0, 48)
             setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(seekBar: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {
                     currentMusicVolume = progress / 100f
@@ -409,34 +383,31 @@ class MainActivity : AppCompatActivity() {
             })
         }
 
-        // 2. About Us Button (Outlined Style)
         val btnAbout = com.google.android.material.button.MaterialButton(this).apply {
             text = "About Us"
             backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.TRANSPARENT)
             strokeColor = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#E91E63"))
             strokeWidth = 3
             elevation = 0f
-            setTextColor(android.graphics.Color.parseColor("#E91E63")) // Pink text
+            setTextColor(android.graphics.Color.parseColor("#E91E63"))
 
             setOnClickListener {
                 showAboutDialog()
             }
         }
 
-        // 3. Privacy Policy Button (Text Style)
         val btnPrivacy = com.google.android.material.button.MaterialButton(this).apply {
             text = "Privacy Policy"
             backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.TRANSPARENT)
             elevation = 0f
             strokeWidth = 0
-            setTextColor(android.graphics.Color.parseColor("#E91E63")) // Pink text
+            setTextColor(android.graphics.Color.parseColor("#E91E63"))
 
             setOnClickListener {
                 showPrivacyDialog()
             }
         }
 
-        // Assemble the layout (Notice themeSwitch is gone!)
         layout.addView(volumeTitle)
         layout.addView(seekBar)
         layout.addView(btnAbout)
@@ -450,7 +421,6 @@ class MainActivity : AppCompatActivity() {
             }
             .show()
     }
-
 
     private fun showAboutDialog() {
         val bioText = """
@@ -492,13 +462,11 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    // 3. Start music when the app is on screen
     override fun onResume() {
         super.onResume()
         backgroundMusic?.start()
     }
 
-    // 4. Pause music if the user minimizes the app or turns off their screen
     override fun onPause() {
         super.onPause()
         if (backgroundMusic?.isPlaying == true) {
@@ -506,11 +474,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // 5. Clean up memory when the app is completely closed
     override fun onDestroy() {
         super.onDestroy()
-        pauseTimer() // Your existing timer cleanup
-
+        pauseTimer()
         backgroundMusic?.release()
         backgroundMusic = null
     }
