@@ -80,7 +80,6 @@ class ZipPuzzleView(context: Context, attrs: AttributeSet?) : View(context, attr
     private fun generateRandomLevel() {
         walls.clear()
 
-        // RESTORED: We now require 100% of the grid to be filled (Total Cells)
         val totalCells = gridSize * gridSize
 
         val numberOfWalls: Int
@@ -109,11 +108,18 @@ class ZipPuzzleView(context: Context, attrs: AttributeSet?) : View(context, attr
         while (!successfullyGenerated) {
             hiddenPath.clear()
             val visited = Array(gridSize) { BooleanArray(gridSize) }
-            val dirs = arrayOf(Pair(0, -1), Pair(0, 1), Pair(-1, 0), Pair(1, 0))
             var iterations = 0
-
-            // Increased iteration depth to help 8x8 grids find a path faster
             val maxIterations = 50000
+
+            // NEW FIX: Helper function to count how many open spaces are around a cell
+            fun countFreeNeighbors(x: Int, y: Int): Int {
+                var count = 0
+                if (x > 0 && !visited[x - 1][y]) count++
+                if (x < gridSize - 1 && !visited[x + 1][y]) count++
+                if (y > 0 && !visited[x][y - 1]) count++
+                if (y < gridSize - 1 && !visited[x][y + 1]) count++
+                return count
+            }
 
             fun findFullPath(currentX: Int, currentY: Int): Boolean {
                 iterations++
@@ -122,16 +128,26 @@ class ZipPuzzleView(context: Context, attrs: AttributeSet?) : View(context, attr
                 hiddenPath.add(Pair(currentX, currentY))
                 visited[currentX][currentY] = true
 
-                // RESTORED: Must hit every single cell on the board
                 if (hiddenPath.size == totalCells) return true
 
-                dirs.shuffle()
+                val validMoves = mutableListOf<Pair<Int, Int>>()
+                val dirs = arrayOf(Pair(0, -1), Pair(0, 1), Pair(-1, 0), Pair(1, 0))
+
                 for (dir in dirs) {
                     val nx = currentX + dir.first
                     val ny = currentY + dir.second
                     if (nx in 0 until gridSize && ny in 0 until gridSize && !visited[nx][ny]) {
-                        if (findFullPath(nx, ny)) return true
+                        validMoves.add(Pair(nx, ny))
                     }
+                }
+
+                // THE FIX: Warnsdorff's Heuristic
+                // We sort the possible moves so the algorithm naturally hugs the edges and avoids trapping itself.
+                validMoves.shuffle() // Slight shuffle keeps levels unique
+                validMoves.sortBy { countFreeNeighbors(it.first, it.second) }
+
+                for (move in validMoves) {
+                    if (findFullPath(move.first, move.second)) return true
                 }
 
                 visited[currentX][currentY] = false
@@ -153,8 +169,6 @@ class ZipPuzzleView(context: Context, attrs: AttributeSet?) : View(context, attr
         nodes.add(Node(hiddenPath[0].first, hiddenPath[0].second, 1))
 
         val intermediateIndices = mutableListOf<Int>()
-
-        // RESTORED: Uses totalCells to place the final node
         val availableIndices = (1 until totalCells - 1).toMutableList()
         availableIndices.shuffle()
 
@@ -169,7 +183,6 @@ class ZipPuzzleView(context: Context, attrs: AttributeSet?) : View(context, attr
             currentNumber++
         }
 
-        // RESTORED: Final node is placed exactly at the end of the 100% path
         nodes.add(Node(hiddenPath[totalCells - 1].first, hiddenPath[totalCells - 1].second, currentMaxNodes))
 
         targetNodes = nodes
@@ -190,7 +203,7 @@ class ZipPuzzleView(context: Context, attrs: AttributeSet?) : View(context, attr
         }
 
         allPossibleWalls.shuffle()
-        for (i in 0 until kotlin.math.min(numberOfWalls, allPossibleWalls.size)) {
+        for (i in 0 until min(numberOfWalls, allPossibleWalls.size)) {
             walls.add(allPossibleWalls[i])
         }
     }
@@ -292,7 +305,6 @@ class ZipPuzzleView(context: Context, attrs: AttributeSet?) : View(context, attr
     }
 
     private fun validateGame() {
-        // RESTORED: Must strictly fill every single cell on the board to win
         val totalCells = gridSize * gridSize
 
         if (currentPath.size != totalCells) {
@@ -320,7 +332,7 @@ class ZipPuzzleView(context: Context, attrs: AttributeSet?) : View(context, attr
         when (mode) {
             "EASY" -> gridSize = 5
             "MEDIUM" -> gridSize = 6
-            "HARD" -> gridSize = 8 // Change to 7 if 8 takes too long to load!
+            "HARD" -> gridSize = 8
         }
         if (width > 0 && height > 0) {
             cellSize = (min(width, height) / gridSize).toFloat()

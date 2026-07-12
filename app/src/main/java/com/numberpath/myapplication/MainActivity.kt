@@ -273,6 +273,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     // --- WIN LOGIC ---
+    // --- WIN LOGIC ---
     private fun handleLevelWin() {
         pauseTimer()
 
@@ -343,6 +344,47 @@ class MainActivity : AppCompatActivity() {
 
         tvMaxStreak.text = maxStreak.toString()
         tvCurrentStreakTitle.text = "$currentStreak-day win streak 🔥"
+
+        // --- NEW: DYNAMIC 7-DAY UI LOGIC ---
+        // 1. Figure out what day of the week today actually is
+        // Java's DayOfWeek goes from 1 (Monday) to 7 (Sunday).
+        // Our XML UI goes from 0 (Sunday) to 6 (Saturday).
+        val todayIndex = if (today.dayOfWeek.value == 7) 0 else today.dayOfWeek.value
+
+        val dayCards = listOf(R.id.cardDay1, R.id.cardDay2, R.id.cardDay3, R.id.cardDay4, R.id.cardDay5, R.id.cardDay6, R.id.cardDay7)
+        val dayChecks = listOf(R.id.tvDayCheck1, R.id.tvDayCheck2, R.id.tvDayCheck3, R.id.tvDayCheck4, R.id.tvDayCheck5, R.id.tvDayCheck6, R.id.tvDayCheck7)
+
+        for (i in 0..6) {
+            val card = findViewById<com.google.android.material.card.MaterialCardView>(dayCards[i])
+            val check = findViewById<TextView>(dayChecks[i])
+
+            // 2. Calculate how many days ago this specific circle represents
+            val daysAgo = (todayIndex - i + 7) % 7
+
+            // 3. If this circle falls within your current streak length, light it up!
+            if (daysAgo < currentStreak && daysAgo < 7) {
+                // Completed day (Solid Yellow, No Outline, Show Checkmark)
+                card.setCardBackgroundColor(android.graphics.Color.parseColor("#FFB300"))
+                card.strokeWidth = 0
+                check.visibility = View.VISIBLE
+            } else {
+                // Future/Missed day (White fill, Grey Outline, Hide Checkmark)
+                card.setCardBackgroundColor(android.graphics.Color.WHITE)
+                card.strokeWidth = 3
+                card.strokeColor = android.graphics.Color.parseColor("#E0E0E0")
+                check.visibility = View.GONE
+            }
+        }
+
+        // --- NEW: UNLOCK ACHIEVEMENTS ---
+        findViewById<View>(R.id.layoutAchieve3).alpha = if (maxStreak >= 3) 1.0f else 0.3f
+        findViewById<View>(R.id.layoutAchieve5).alpha = if (maxStreak >= 5) 1.0f else 0.3f
+        findViewById<View>(R.id.layoutAchieve7).alpha = if (maxStreak >= 7) 1.0f else 0.3f
+        findViewById<View>(R.id.layoutAchieve31).alpha = if (maxStreak >= 31) 1.0f else 0.3f
+
+        // --- NEW: BURST THE FIRECRACKERS! ---
+        val confetti = findViewById<ConfettiView>(R.id.confettiView)
+        confetti.burst()
 
         btnNextLevel.setOnClickListener {
             screenResults.visibility = View.GONE
