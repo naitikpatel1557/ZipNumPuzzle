@@ -39,8 +39,12 @@ class MainActivity : AppCompatActivity() {
     // Game State
     private var playingLevel = 1
     private var highestUnlockedLevel = 1
-    private val totalLevels = 1000
+    private val totalLevels = 100
     private lateinit var prefs: SharedPreferences
+
+    // --- ECONOMY STATE ---
+    private var totalCoins = 0
+    private var equippedColor = "#E91E63" // Default Pink
 
     // Timer State
     private var secondsElapsed = 0
@@ -99,7 +103,22 @@ class MainActivity : AppCompatActivity() {
         // --- NAVIGATION LISTENERS ---
         findViewById<View>(R.id.btnSettings).setOnClickListener { showSettingsDialog() }
         findViewById<View>(R.id.btnReset).setOnClickListener { puzzleBoard.resetPath() }
-        findViewById<Button>(R.id.btnHint).setOnClickListener { puzzleBoard.showHint() }
+
+        // --- HINT ECONOMY ---
+        findViewById<Button>(R.id.btnHint).setOnClickListener {
+            if (totalCoins >= 25) {
+                // Deduct coins and save
+                totalCoins -= 25
+                prefs.edit().putInt("TOTAL_COINS", totalCoins).apply()
+
+                // Update UI and trigger hint
+                findViewById<Button>(R.id.btnShop).text = "🪙 $totalCoins | SHOP"
+                puzzleBoard.showHint()
+            } else {
+                // Not enough money!
+                android.widget.Toast.makeText(this, "Not enough coins! Win levels to earn more.", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
 
         // Main Menu PLAY button -> Shows Difficulty Screen
         findViewById<Button>(R.id.btnPlay).setOnClickListener {
@@ -111,6 +130,18 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.btnBackFromDifficulty).setOnClickListener {
             screenDifficulty.visibility = View.GONE
             screenMainMenu.visibility = View.VISIBLE
+        }
+
+        // --- LOAD ECONOMY ---
+        totalCoins = prefs.getInt("TOTAL_COINS", 0)
+        equippedColor = prefs.getString("EQUIPPED_COLOR", "#E91E63") ?: "#E91E63"
+
+        // Ensure btnShop exists in activity_main.xml inside screenMainMenu!
+        findViewById<Button>(R.id.btnShop).text = "🪙 $totalCoins | SHOP"
+        puzzleBoard.setPathColor(equippedColor)
+
+        findViewById<Button>(R.id.btnShop).setOnClickListener {
+            showShopDialog()
         }
 
         // Difficulty Selection Buttons
@@ -273,7 +304,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     // --- WIN LOGIC ---
-    // --- WIN LOGIC ---
     private fun handleLevelWin() {
         pauseTimer()
 
@@ -298,6 +328,8 @@ class MainActivity : AppCompatActivity() {
 
         totalPlays++
 
+        var coinsEarnedThisLevel = 10 // Base win reward
+
         if (lastPlayedStr.isNullOrEmpty()) {
             currentStreak = 1
         } else {
@@ -306,6 +338,7 @@ class MainActivity : AppCompatActivity() {
 
             if (daysBetween == 1L) {
                 currentStreak++
+                coinsEarnedThisLevel += 50 // Streak bonus!
             } else if (daysBetween > 1L) {
                 currentStreak = 1
             }
@@ -313,11 +346,14 @@ class MainActivity : AppCompatActivity() {
 
         if (currentStreak > maxStreak) maxStreak = currentStreak
 
+        totalCoins += coinsEarnedThisLevel
+
         prefs.edit()
             .putString("LAST_PLAYED_DATE", today.toString())
             .putInt("CURRENT_STREAK", currentStreak)
             .putInt("MAX_STREAK", maxStreak)
             .putInt("TOTAL_PLAYS", totalPlays)
+            .putInt("TOTAL_COINS", totalCoins)
             .apply()
 
         refreshLevelGrid()
@@ -345,10 +381,7 @@ class MainActivity : AppCompatActivity() {
         tvMaxStreak.text = maxStreak.toString()
         tvCurrentStreakTitle.text = "$currentStreak-day win streak 🔥"
 
-        // --- NEW: DYNAMIC 7-DAY UI LOGIC ---
-        // 1. Figure out what day of the week today actually is
-        // Java's DayOfWeek goes from 1 (Monday) to 7 (Sunday).
-        // Our XML UI goes from 0 (Sunday) to 6 (Saturday).
+        // --- 7-DAY CALENDAR UI ---
         val todayIndex = if (today.dayOfWeek.value == 7) 0 else today.dayOfWeek.value
 
         val dayCards = listOf(R.id.cardDay1, R.id.cardDay2, R.id.cardDay3, R.id.cardDay4, R.id.cardDay5, R.id.cardDay6, R.id.cardDay7)
@@ -358,17 +391,13 @@ class MainActivity : AppCompatActivity() {
             val card = findViewById<com.google.android.material.card.MaterialCardView>(dayCards[i])
             val check = findViewById<TextView>(dayChecks[i])
 
-            // 2. Calculate how many days ago this specific circle represents
             val daysAgo = (todayIndex - i + 7) % 7
 
-            // 3. If this circle falls within your current streak length, light it up!
             if (daysAgo < currentStreak && daysAgo < 7) {
-                // Completed day (Solid Yellow, No Outline, Show Checkmark)
                 card.setCardBackgroundColor(android.graphics.Color.parseColor("#FFB300"))
                 card.strokeWidth = 0
                 check.visibility = View.VISIBLE
             } else {
-                // Future/Missed day (White fill, Grey Outline, Hide Checkmark)
                 card.setCardBackgroundColor(android.graphics.Color.WHITE)
                 card.strokeWidth = 3
                 card.strokeColor = android.graphics.Color.parseColor("#E0E0E0")
@@ -376,15 +405,18 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // --- NEW: UNLOCK ACHIEVEMENTS ---
+        // --- ACHIEVEMENTS LOGIC ---
         findViewById<View>(R.id.layoutAchieve3).alpha = if (maxStreak >= 3) 1.0f else 0.3f
         findViewById<View>(R.id.layoutAchieve5).alpha = if (maxStreak >= 5) 1.0f else 0.3f
         findViewById<View>(R.id.layoutAchieve7).alpha = if (maxStreak >= 7) 1.0f else 0.3f
         findViewById<View>(R.id.layoutAchieve31).alpha = if (maxStreak >= 31) 1.0f else 0.3f
 
-        // --- NEW: BURST THE FIRECRACKERS! ---
+        // Update Shop UI
+        findViewById<Button>(R.id.btnShop).text = "🪙 $totalCoins | SHOP"
+
+        // --- CONFETTI BURST ---
         val confetti = findViewById<ConfettiView>(R.id.confettiView)
-        confetti.burst()
+        confetti?.burst()
 
         btnNextLevel.setOnClickListener {
             screenResults.visibility = View.GONE
@@ -395,6 +427,76 @@ class MainActivity : AppCompatActivity() {
             screenResults.visibility = View.GONE
             showLevelSelection()
         }
+    }
+
+    private fun showShopDialog() {
+        val layout = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(64, 32, 64, 32)
+        }
+
+        val titleText = android.widget.TextView(this).apply {
+            text = "Your Wallet: $totalCoins 🪙"
+            textSize = 20f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setPadding(0, 0, 0, 32)
+        }
+        layout.addView(titleText)
+
+        val items = listOf(
+            Triple("Classic Pink", "#E91E63", 0),
+            Triple("Neon Green", "#00E676", 150),
+            Triple("Electric Blue", "#00E5FF", 300)
+        )
+
+        var dialog: androidx.appcompat.app.AlertDialog? = null
+
+        for (item in items) {
+            val (name, hex, cost) = item
+            val isOwned = cost == 0 || prefs.getBoolean("OWNED_$hex", false)
+            val isEquipped = equippedColor == hex
+
+            val itemButton = com.google.android.material.button.MaterialButton(this).apply {
+                text = when {
+                    isEquipped -> "$name (EQUIPPED)"
+                    isOwned -> "$name (OWNED)"
+                    else -> "$name - $cost 🪙"
+                }
+
+                backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor(hex))
+                setTextColor(if (hex == "#00E676" || hex == "#00E5FF") android.graphics.Color.BLACK else android.graphics.Color.WHITE)
+
+                setOnClickListener {
+                    if (isOwned) {
+                        equippedColor = hex
+                        prefs.edit().putString("EQUIPPED_COLOR", hex).apply()
+                        puzzleBoard.setPathColor(hex)
+                        dialog?.dismiss()
+                    } else if (totalCoins >= cost) {
+                        totalCoins -= cost
+                        equippedColor = hex
+                        prefs.edit()
+                            .putInt("TOTAL_COINS", totalCoins)
+                            .putBoolean("OWNED_$hex", true)
+                            .putString("EQUIPPED_COLOR", hex)
+                            .apply()
+
+                        findViewById<Button>(R.id.btnShop).text = "🪙 $totalCoins | SHOP"
+                        puzzleBoard.setPathColor(hex)
+                        dialog?.dismiss()
+                    } else {
+                        android.widget.Toast.makeText(context, "Need more coins!", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+            layout.addView(itemButton)
+        }
+
+        dialog = com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle("Customization Shop")
+            .setView(layout)
+            .setPositiveButton("Close", null)
+            .show()
     }
 
     private fun showSettingsDialog() {
@@ -433,9 +535,7 @@ class MainActivity : AppCompatActivity() {
             elevation = 0f
             setTextColor(android.graphics.Color.parseColor("#E91E63"))
 
-            setOnClickListener {
-                showAboutDialog()
-            }
+            setOnClickListener { showAboutDialog() }
         }
 
         val btnPrivacy = com.google.android.material.button.MaterialButton(this).apply {
@@ -445,9 +545,7 @@ class MainActivity : AppCompatActivity() {
             strokeWidth = 0
             setTextColor(android.graphics.Color.parseColor("#E91E63"))
 
-            setOnClickListener {
-                showPrivacyDialog()
-            }
+            setOnClickListener { showPrivacyDialog() }
         }
 
         layout.addView(volumeTitle)
@@ -458,9 +556,7 @@ class MainActivity : AppCompatActivity() {
         settingsDialog = com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
             .setTitle("Settings")
             .setView(layout)
-            .setPositiveButton("Close") { dialog, _ ->
-                dialog.dismiss()
-            }
+            .setPositiveButton("Close") { dialog, _ -> dialog.dismiss() }
             .show()
     }
 
@@ -480,9 +576,7 @@ class MainActivity : AppCompatActivity() {
         com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
             .setTitle("About Us")
             .setMessage(bioText)
-            .setPositiveButton("Awesome") { dialog, _ ->
-                dialog.dismiss()
-            }
+            .setPositiveButton("Awesome") { dialog, _ -> dialog.dismiss() }
             .show()
     }
 
@@ -498,9 +592,7 @@ class MainActivity : AppCompatActivity() {
         com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
             .setTitle("Privacy Policy")
             .setMessage(privacyText)
-            .setPositiveButton("I Understand") { dialog, _ ->
-                dialog.dismiss()
-            }
+            .setPositiveButton("I Understand") { dialog, _ -> dialog.dismiss() }
             .show()
     }
 

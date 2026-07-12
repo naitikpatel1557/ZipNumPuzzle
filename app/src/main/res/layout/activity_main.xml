@@ -31,6 +31,16 @@
             android:textSize="24sp"
             android:backgroundTint="#000000"
             android:textColor="#FFFFFF" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnShop"
+            android:layout_width="200dp"
+            android:layout_height="60dp"
+            android:text="🪙 0 | SHOP"
+            android:textSize="18sp"
+            android:layout_marginTop="16dp"
+            app:backgroundTint="#FFB300"
+            android:textColor="#000000" />
     </LinearLayout>
 
     <!-- Result Screen Overlay (Hidden by default) -->
@@ -252,9 +262,10 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
-                android:text="Show Hint"
+                android:text="Hint (25🪙)"
                 android:textColor="#FFFFFF"
                 app:backgroundTint="#E91E63" />
+
         </LinearLayout>
 
         <com.google.android.material.card.MaterialCardView

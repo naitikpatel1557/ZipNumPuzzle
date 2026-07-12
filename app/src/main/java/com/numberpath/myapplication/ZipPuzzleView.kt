@@ -46,6 +46,7 @@ class ZipPuzzleView(context: Context, attrs: AttributeSet?) : View(context, attr
         isAntiAlias = true
     }
 
+    // Notice the color is no longer hardcoded here!
     private val pathPaint = Paint().apply {
         color = "#E91E63".toColorInt()
         style = Paint.Style.STROKE
@@ -111,7 +112,6 @@ class ZipPuzzleView(context: Context, attrs: AttributeSet?) : View(context, attr
             var iterations = 0
             val maxIterations = 50000
 
-            // NEW FIX: Helper function to count how many open spaces are around a cell
             fun countFreeNeighbors(x: Int, y: Int): Int {
                 var count = 0
                 if (x > 0 && !visited[x - 1][y]) count++
@@ -141,9 +141,7 @@ class ZipPuzzleView(context: Context, attrs: AttributeSet?) : View(context, attr
                     }
                 }
 
-                // THE FIX: Warnsdorff's Heuristic
-                // We sort the possible moves so the algorithm naturally hugs the edges and avoids trapping itself.
-                validMoves.shuffle() // Slight shuffle keeps levels unique
+                validMoves.shuffle()
                 validMoves.sortBy { countFreeNeighbors(it.first, it.second) }
 
                 for (move in validMoves) {
@@ -366,6 +364,12 @@ class ZipPuzzleView(context: Context, attrs: AttributeSet?) : View(context, attr
         vibratorManager.defaultVibrator.vibrate(
             VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE)
         )
+    }
+
+    // --- NEW: CUSTOMIZATION ENGINE ---
+    fun setPathColor(hexColor: String) {
+        pathPaint.color = hexColor.toColorInt()
+        invalidate() // Redraw the board immediately with the new color!
     }
 
     data class Node(val x: Int, val y: Int, val number: Int)
