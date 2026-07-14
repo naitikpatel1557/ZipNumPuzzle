@@ -171,37 +171,98 @@
 
             <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#E0E0E0" android:layout_marginBottom="16dp"/>
 
-            <LinearLayout
+            <HorizontalScrollView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:baselineAligned="false"
+                android:scrollbars="none"
+                android:clipToPadding="false"
                 android:layout_marginBottom="16dp">
 
-                <LinearLayout android:id="@+id/layoutAchieve3" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical" android:alpha="0.3">
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="⭐" android:textSize="36sp" />
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="3 days" android:textSize="12sp" android:textStyle="bold" android:textColor="#000000"/>
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Star" android:textSize="10sp" android:textColor="#757575"/>
-                </LinearLayout>
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:baselineAligned="false">
 
-                <LinearLayout android:id="@+id/layoutAchieve5" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical" android:alpha="0.3">
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🌟" android:textSize="36sp" />
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="5 days" android:textSize="12sp" android:textStyle="bold" android:textColor="#000000"/>
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Superstar" android:textSize="10sp" android:textColor="#757575"/>
-                </LinearLayout>
+                    <LinearLayout android:id="@+id/achieve3" android:layout_width="80dp" android:layout_height="wrap_content" android:gravity="center" android:orientation="vertical" android:alpha="0.3">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="⭐" android:textSize="36sp" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="3 days" android:textSize="12sp" android:textStyle="bold" android:textColor="#000000"/>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Star" android:textSize="10sp" android:textColor="#757575"/>
+                    </LinearLayout>
 
-                <LinearLayout android:id="@+id/layoutAchieve7" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical" android:alpha="0.3">
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🏆" android:textSize="36sp" />
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="7 days" android:textSize="12sp" android:textStyle="bold" android:textColor="#000000"/>
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Champion" android:textSize="10sp" android:textColor="#757575"/>
-                </LinearLayout>
+                    <LinearLayout android:id="@+id/achieve5" android:layout_width="80dp" android:layout_height="wrap_content" android:gravity="center" android:orientation="vertical" android:alpha="0.3">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🌟" android:textSize="36sp" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="5 days" android:textSize="12sp" android:textStyle="bold" android:textColor="#000000"/>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Superstar" android:textSize="10sp" android:textColor="#757575"/>
+                    </LinearLayout>
 
-                <LinearLayout android:id="@+id/layoutAchieve31" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical" android:alpha="0.3">
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🏅" android:textSize="36sp" />
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="31 days" android:textSize="12sp" android:textStyle="bold" android:textColor="#000000"/>
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Icon" android:textSize="10sp" android:textColor="#757575"/>
+                    <LinearLayout android:id="@+id/achieve7" android:layout_width="80dp" android:layout_height="wrap_content" android:gravity="center" android:orientation="vertical" android:alpha="0.3">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🏆" android:textSize="36sp" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="7 days" android:textSize="12sp" android:textStyle="bold" android:textColor="#000000"/>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Champion" android:textSize="10sp" android:textColor="#757575"/>
+                    </LinearLayout>
+
+                    <LinearLayout android:id="@+id/achieve31" android:layout_width="80dp" android:layout_height="wrap_content" android:gravity="center" android:orientation="vertical" android:alpha="0.3">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🏅" android:textSize="36sp" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="31 days" android:textSize="12sp" android:textStyle="bold" android:textColor="#000000"/>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Icon" android:textSize="10sp" android:textColor="#757575"/>
+                    </LinearLayout>
+
+                    <LinearLayout android:id="@+id/achieve50" android:layout_width="80dp" android:layout_height="wrap_content" android:gravity="center" android:orientation="vertical" android:alpha="0.3">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🏛️" android:textSize="36sp" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="50 days" android:textSize="12sp" android:textStyle="bold" android:textColor="#000000"/>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Hall of fame" android:textSize="10sp" android:textColor="#757575"/>
+                    </LinearLayout>
+
+                    <LinearLayout android:id="@+id/achieve100" android:layout_width="80dp" android:layout_height="wrap_content" android:gravity="center" android:orientation="vertical" android:alpha="0.3">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🛡️" android:textSize="36sp" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="100 days" android:textSize="12sp" android:textStyle="bold" android:textColor="#000000"/>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Invincible" android:textSize="10sp" android:textColor="#757575"/>
+                    </LinearLayout>
+
+                    <LinearLayout android:id="@+id/achieve150" android:layout_width="80dp" android:layout_height="wrap_content" android:gravity="center" android:orientation="vertical" android:alpha="0.3">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="⚔️" android:textSize="36sp" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="150 days" android:textSize="12sp" android:textStyle="bold" android:textColor="#000000"/>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Legend" android:textSize="10sp" android:textColor="#757575"/>
+                    </LinearLayout>
+
+                    <LinearLayout android:id="@+id/achieve200" android:layout_width="80dp" android:layout_height="wrap_content" android:gravity="center" android:orientation="vertical" android:alpha="0.3">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🥇" android:textSize="36sp" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="200 days" android:textSize="12sp" android:textStyle="bold" android:textColor="#000000"/>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Golden" android:textSize="10sp" android:textColor="#757575"/>
+                    </LinearLayout>
+
+                    <LinearLayout android:id="@+id/achieve250" android:layout_width="80dp" android:layout_height="wrap_content" android:gravity="center" android:orientation="vertical" android:alpha="0.3">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🔭" android:textSize="36sp" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="250 days" android:textSize="12sp" android:textStyle="bold" android:textColor="#000000"/>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Visionary" android:textSize="10sp" android:textColor="#757575"/>
+                    </LinearLayout>
+
+                    <LinearLayout android:id="@+id/achieve300" android:layout_width="80dp" android:layout_height="wrap_content" android:gravity="center" android:orientation="vertical" android:alpha="0.3">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="💎" android:textSize="36sp" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="300 days" android:textSize="12sp" android:textStyle="bold" android:textColor="#000000"/>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Supreme" android:textSize="10sp" android:textColor="#757575"/>
+                    </LinearLayout>
+
+                    <LinearLayout android:id="@+id/achieve365" android:layout_width="80dp" android:layout_height="wrap_content" android:gravity="center" android:orientation="vertical" android:alpha="0.3">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="☀️" android:textSize="36sp" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="365 days" android:textSize="12sp" android:textStyle="bold" android:textColor="#000000"/>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Interstellar" android:textSize="10sp" android:textColor="#757575"/>
+                    </LinearLayout>
+
+                    <LinearLayout android:id="@+id/achieve500" android:layout_width="80dp" android:layout_height="wrap_content" android:gravity="center" android:orientation="vertical" android:alpha="0.3">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🪐" android:textSize="36sp" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="500 days" android:textSize="12sp" android:textStyle="bold" android:textColor="#000000"/>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Galactic" android:textSize="10sp" android:textColor="#757575"/>
+                    </LinearLayout>
+
+                    <LinearLayout android:id="@+id/achieve1000" android:layout_width="80dp" android:layout_height="wrap_content" android:gravity="center" android:orientation="vertical" android:alpha="0.3">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🌌" android:textSize="36sp" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="1000 days" android:textSize="12sp" android:textStyle="bold" android:textColor="#000000"/>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Cosmic" android:textSize="10sp" android:textColor="#757575"/>
+                    </LinearLayout>
                 </LinearLayout>
-            </LinearLayout>
+            </HorizontalScrollView>
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnNextLevelFromResults"

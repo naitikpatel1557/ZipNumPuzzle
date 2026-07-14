@@ -15,6 +15,10 @@ import kotlin.math.min
 
 class ZipPuzzleView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
 
+
+    // --- NEW: Gradient Tracking ---
+    private var currentPathStyle = "#E91E63" // Default pink
+
     // --- Configuration ---
     private var gridSize = 5
     var currentDifficulty = "EASY"
@@ -76,6 +80,7 @@ class ZipPuzzleView(context: Context, attrs: AttributeSet?) : View(context, attr
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         cellSize = (min(w, h) / gridSize).toFloat()
+        applyPathStyle() // Re-apply gradient based on new screen size
     }
 
     private fun generateRandomLevel() {
@@ -262,10 +267,18 @@ class ZipPuzzleView(context: Context, attrs: AttributeSet?) : View(context, attr
 
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
-                currentPath.clear()
-                currentPath.add(Pair(gridX, gridY))
-                if (targetNodes.any { it.x == gridX && it.y == gridY }) {
-                    vibrateOnNumberHit()
+                val lastCell = currentPath.lastOrNull()
+                val touchedCell = Pair(gridX, gridY)
+
+                // --- FEATURE 1: PATH RESUME ---
+                // If the user touches the exact end of the current line, DO NOT clear the path.
+                // Otherwise (they touched somewhere else), clear it and start fresh.
+                if (lastCell != touchedCell) {
+                    currentPath.clear()
+                    currentPath.add(touchedCell)
+                    if (targetNodes.any { it.x == gridX && it.y == gridY }) {
+                        vibrateOnNumberHit()
+                    }
                 }
                 invalidate()
             }
@@ -273,18 +286,29 @@ class ZipPuzzleView(context: Context, attrs: AttributeSet?) : View(context, attr
                 val lastCell = currentPath.lastOrNull()
                 val newCell = Pair(gridX, gridY)
 
-                if (lastCell != null && lastCell != newCell && !currentPath.contains(newCell)) {
-                    val dx = Math.abs(lastCell.first - gridX)
-                    val dy = Math.abs(lastCell.second - gridY)
+                if (lastCell != null && lastCell != newCell) {
 
-                    if ((dx == 1 && dy == 0) || (dx == 0 && dy == 1)) {
-                        val isBlocked = walls.any { it.blocks(lastCell, newCell) }
-                        if (!isBlocked) {
-                            currentPath.add(newCell)
-                            if (targetNodes.any { it.x == gridX && it.y == gridY }) {
-                                vibrateOnNumberHit()
+                    // --- FEATURE 2: BACKTRACKING (REVERSE) ---
+                    // If the user drags back to the previous cell, erase the last step!
+                    if (currentPath.size >= 2 && currentPath[currentPath.size - 2] == newCell) {
+                        currentPath.removeAt(currentPath.size - 1)
+                        invalidate()
+                    }
+                    // --- NORMAL FORWARD DRAWING ---
+                    else if (!currentPath.contains(newCell)) {
+                        val dx = Math.abs(lastCell.first - gridX)
+                        val dy = Math.abs(lastCell.second - gridY)
+
+                        // Must move exactly 1 block horizontally OR vertically
+                        if ((dx == 1 && dy == 0) || (dx == 0 && dy == 1)) {
+                            val isBlocked = walls.any { it.blocks(lastCell, newCell) }
+                            if (!isBlocked) {
+                                currentPath.add(newCell)
+                                if (targetNodes.any { it.x == gridX && it.y == gridY }) {
+                                    vibrateOnNumberHit()
+                                }
+                                invalidate()
                             }
-                            invalidate()
                         }
                     }
                 }
@@ -367,9 +391,29 @@ class ZipPuzzleView(context: Context, attrs: AttributeSet?) : View(context, attr
     }
 
     // --- NEW: CUSTOMIZATION ENGINE ---
-    fun setPathColor(hexColor: String) {
-        pathPaint.color = hexColor.toColorInt()
-        invalidate() // Redraw the board immediately with the new color!
+    fun setPathColor(styleString: String) {
+        currentPathStyle = styleString
+        applyPathStyle()
+        invalidate() // Redraw the board immediately
+    }
+
+    private fun applyPathStyle() {
+        if (width == 0 || height == 0) return // Wait until the view is drawn
+
+        if (currentPathStyle.contains(",")) {
+            // It's a gradient! Split the colors by the comma
+            val colors = currentPathStyle.split(",").map { android.graphics.Color.parseColor(it) }.toIntArray()
+
+            // Apply a LinearGradient across the entire board
+            pathPaint.shader = android.graphics.LinearGradient(
+                0f, 0f, width.toFloat(), height.toFloat(),
+                colors, null, android.graphics.Shader.TileMode.CLAMP
+            )
+        } else {
+            // It's a solid color! Remove the shader and set the standard color
+            pathPaint.shader = null
+            pathPaint.color = android.graphics.Color.parseColor(currentPathStyle)
+        }
     }
 
     data class Node(val x: Int, val y: Int, val number: Int)

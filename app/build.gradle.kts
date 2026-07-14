@@ -48,4 +48,8 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     implementation("androidx.core:core-splashscreen:1.0.1")
+    // Google AdMob
+    implementation("com.google.android.gms:play-services-ads:23.0.0")
+    // Google Play Games Services (Leaderboards)
+    implementation("com.google.android.gms:play-services-games-v2:19.0.0")
 }

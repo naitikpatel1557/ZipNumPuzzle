@@ -2,18 +2,28 @@ package com.numberpath.myapplication
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.media.MediaPlayer
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
+import android.view.Gravity
 import android.view.View
 import android.widget.Button
 import android.widget.GridLayout
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import android.media.MediaPlayer
-import android.view.Gravity
+import com.google.android.gms.ads.AdError
+import com.google.android.gms.ads.AdRequest
+import com.google.android.gms.ads.FullScreenContentCallback
+import com.google.android.gms.ads.LoadAdError
+import com.google.android.gms.ads.MobileAds
+import com.google.android.gms.ads.rewarded.RewardedAd
+import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
+import com.google.android.gms.games.PlayGames
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
@@ -42,9 +52,13 @@ class MainActivity : AppCompatActivity() {
     private val totalLevels = 100
     private lateinit var prefs: SharedPreferences
 
-    // --- ECONOMY STATE ---
+    // Economy State
     private var totalCoins = 0
-    private var equippedColor = "#E91E63" // Default Pink
+    private var equippedColor = "#E91E63"
+
+    // --- ADMOB STATE ---
+    private var rewardedAd: RewardedAd? = null
+    private val adUnitId = "ca-app-pub-1048582027476561/9159199511"
 
     // Timer State
     private var secondsElapsed = 0
@@ -66,9 +80,14 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         prefs = getSharedPreferences("ZipGamePrefs", Context.MODE_PRIVATE)
-
-        val savedTheme = prefs.getInt("THEME_MODE", androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
         androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES)
+
+        // --- INITIALIZE GOOGLE SERVICES ---
+        MobileAds.initialize(this) {}
+        loadRewardedAd()
+
+        // Initialize Play Games Services
+        PlayGames.getGamesSignInClient(this).signIn()
 
         // Bind Views
         screenMainMenu = findViewById(R.id.screenMainMenu)
@@ -81,11 +100,12 @@ class MainActivity : AppCompatActivity() {
         tvLevel = findViewById(R.id.tvLevel)
         levelGrid = findViewById(R.id.levelGrid)
 
+        // Background Music Only
         backgroundMusic = MediaPlayer.create(this, R.raw.bg_music)
         backgroundMusic?.isLooping = true
         backgroundMusic?.setVolume(0.4f, 0.4f)
 
-        // --- HOW TO PLAY TOGGLE LOGIC ---
+        // UI Toggles
         val header = findViewById<View>(R.id.layoutHowToPlayHeader)
         val content = findViewById<View>(R.id.layoutHowToPlayContent)
         val arrow = findViewById<View>(R.id.ivArrow)
@@ -100,51 +120,39 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // --- NAVIGATION LISTENERS ---
+        // Navigation
         findViewById<View>(R.id.btnSettings).setOnClickListener { showSettingsDialog() }
         findViewById<View>(R.id.btnReset).setOnClickListener { puzzleBoard.resetPath() }
 
-        // --- HINT ECONOMY ---
+        // --- HINT ECONOMY WITH VIDEO ADS ---
         findViewById<Button>(R.id.btnHint).setOnClickListener {
             if (totalCoins >= 25) {
-                // Deduct coins and save
                 totalCoins -= 25
                 prefs.edit().putInt("TOTAL_COINS", totalCoins).apply()
-
-                // Update UI and trigger hint
                 findViewById<Button>(R.id.btnShop).text = "🪙 $totalCoins | SHOP"
                 puzzleBoard.showHint()
             } else {
-                // Not enough money!
-                android.widget.Toast.makeText(this, "Not enough coins! Win levels to earn more.", android.widget.Toast.LENGTH_SHORT).show()
+                showAdPromptDialog()
             }
         }
 
-        // Main Menu PLAY button -> Shows Difficulty Screen
         findViewById<Button>(R.id.btnPlay).setOnClickListener {
             screenMainMenu.visibility = View.GONE
             screenDifficulty.visibility = View.VISIBLE
         }
-
-        // Back button on Difficulty Screen -> Goes to Main Menu
         findViewById<View>(R.id.btnBackFromDifficulty).setOnClickListener {
             screenDifficulty.visibility = View.GONE
             screenMainMenu.visibility = View.VISIBLE
         }
 
-        // --- LOAD ECONOMY ---
+        // Load Economy
         totalCoins = prefs.getInt("TOTAL_COINS", 0)
         equippedColor = prefs.getString("EQUIPPED_COLOR", "#E91E63") ?: "#E91E63"
-
-        // Ensure btnShop exists in activity_main.xml inside screenMainMenu!
         findViewById<Button>(R.id.btnShop).text = "🪙 $totalCoins | SHOP"
         puzzleBoard.setPathColor(equippedColor)
+        findViewById<Button>(R.id.btnShop).setOnClickListener { showShopDialog() }
 
-        findViewById<Button>(R.id.btnShop).setOnClickListener {
-            showShopDialog()
-        }
-
-        // Difficulty Selection Buttons
+        // Difficulty
         findViewById<View>(R.id.btnEasy).setOnClickListener { openLevelSelectForMode("EASY") }
         findViewById<View>(R.id.btnMedium).setOnClickListener { openLevelSelectForMode("MEDIUM") }
         findViewById<View>(R.id.btnHard).setOnClickListener { openLevelSelectForMode("HARD") }
@@ -153,6 +161,56 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnBackToMenu).setOnClickListener { showMainMenu() }
 
         puzzleBoard.onLevelCleared = { handleLevelWin() }
+    }
+
+    // --- ADMOB LOGIC ---
+    private fun loadRewardedAd() {
+        val adRequest = AdRequest.Builder().build()
+        RewardedAd.load(this, adUnitId, adRequest, object : RewardedAdLoadCallback() {
+            override fun onAdFailedToLoad(adError: LoadAdError) {
+                rewardedAd = null
+            }
+            override fun onAdLoaded(ad: RewardedAd) {
+                rewardedAd = ad
+            }
+        })
+    }
+
+    private fun showAdPromptDialog() {
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle("Out of Coins!")
+            .setMessage("You need 25 coins for a hint. Watch a short video ad to get a free hint instead?")
+            .setPositiveButton("Watch Ad") { dialog, _ ->
+                showRewardedAd()
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showRewardedAd() {
+        if (rewardedAd != null) {
+            rewardedAd?.fullScreenContentCallback = object : FullScreenContentCallback() {
+                override fun onAdDismissedFullScreenContent() {
+                    rewardedAd = null
+                    loadRewardedAd()
+                    backgroundMusic?.start()
+                }
+                override fun onAdFailedToShowFullScreenContent(adError: AdError) {
+                    rewardedAd = null
+                }
+            }
+
+            backgroundMusic?.pause()
+
+            rewardedAd?.show(this) { _ ->
+                puzzleBoard.showHint()
+                Toast.makeText(this, "Hint Unlocked!", Toast.LENGTH_SHORT).show()
+            }
+        } else {
+            Toast.makeText(this, "Ad is still loading. Try again in a few seconds.", Toast.LENGTH_SHORT).show()
+            loadRewardedAd()
+        }
     }
 
     // --- SCREEN NAVIGATION ---
@@ -167,10 +225,8 @@ class MainActivity : AppCompatActivity() {
     private fun openLevelSelectForMode(mode: String) {
         activeDifficultyMode = mode
         highestUnlockedLevel = prefs.getInt("HIGHEST_LEVEL_$activeDifficultyMode", 1)
-
         screenDifficulty.visibility = View.GONE
         screenLevelSelect.visibility = View.VISIBLE
-
         refreshLevelGrid()
     }
 
@@ -179,7 +235,6 @@ class MainActivity : AppCompatActivity() {
         screenDifficulty.visibility = View.GONE
         screenLevelSelect.visibility = View.VISIBLE
         screenGame.visibility = View.GONE
-
         refreshLevelGrid()
     }
 
@@ -327,8 +382,7 @@ class MainActivity : AppCompatActivity() {
         var totalPlays = prefs.getInt("TOTAL_PLAYS", 0)
 
         totalPlays++
-
-        var coinsEarnedThisLevel = 10 // Base win reward
+        var coinsEarnedThisLevel = 10
 
         if (lastPlayedStr.isNullOrEmpty()) {
             currentStreak = 1
@@ -338,14 +392,13 @@ class MainActivity : AppCompatActivity() {
 
             if (daysBetween == 1L) {
                 currentStreak++
-                coinsEarnedThisLevel += 50 // Streak bonus!
+                coinsEarnedThisLevel += 50
             } else if (daysBetween > 1L) {
                 currentStreak = 1
             }
         }
 
         if (currentStreak > maxStreak) maxStreak = currentStreak
-
         totalCoins += coinsEarnedThisLevel
 
         prefs.edit()
@@ -355,6 +408,14 @@ class MainActivity : AppCompatActivity() {
             .putInt("TOTAL_PLAYS", totalPlays)
             .putInt("TOTAL_COINS", totalCoins)
             .apply()
+
+        // --- PUSH TO GLOBAL GOOGLE LEADERBOARD ---
+        try {
+            PlayGames.getLeaderboardsClient(this)
+                .submitScore("CgkI38_WhZIEEAIQAA", maxStreak.toLong())
+        } catch (e: Exception) {
+            Log.e("ZipPuzzle", "Play Games not logged in or configured yet.")
+        }
 
         refreshLevelGrid()
 
@@ -381,16 +442,13 @@ class MainActivity : AppCompatActivity() {
         tvMaxStreak.text = maxStreak.toString()
         tvCurrentStreakTitle.text = "$currentStreak-day win streak 🔥"
 
-        // --- 7-DAY CALENDAR UI ---
         val todayIndex = if (today.dayOfWeek.value == 7) 0 else today.dayOfWeek.value
-
         val dayCards = listOf(R.id.cardDay1, R.id.cardDay2, R.id.cardDay3, R.id.cardDay4, R.id.cardDay5, R.id.cardDay6, R.id.cardDay7)
         val dayChecks = listOf(R.id.tvDayCheck1, R.id.tvDayCheck2, R.id.tvDayCheck3, R.id.tvDayCheck4, R.id.tvDayCheck5, R.id.tvDayCheck6, R.id.tvDayCheck7)
 
         for (i in 0..6) {
             val card = findViewById<com.google.android.material.card.MaterialCardView>(dayCards[i])
             val check = findViewById<TextView>(dayChecks[i])
-
             val daysAgo = (todayIndex - i + 7) % 7
 
             if (daysAgo < currentStreak && daysAgo < 7) {
@@ -405,16 +463,33 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // --- ACHIEVEMENTS LOGIC ---
-        findViewById<View>(R.id.layoutAchieve3).alpha = if (maxStreak >= 3) 1.0f else 0.3f
-        findViewById<View>(R.id.layoutAchieve5).alpha = if (maxStreak >= 5) 1.0f else 0.3f
-        findViewById<View>(R.id.layoutAchieve7).alpha = if (maxStreak >= 7) 1.0f else 0.3f
-        findViewById<View>(R.id.layoutAchieve31).alpha = if (maxStreak >= 31) 1.0f else 0.3f
+        // --- EXTENDED 1000-DAY ACHIEVEMENTS LOGIC ---
+        val achievementTiers = mapOf(
+            R.id.achieve3 to 3,
+            R.id.achieve5 to 5,
+            R.id.achieve7 to 7,
+            R.id.achieve31 to 31,
+            R.id.achieve50 to 50,
+            R.id.achieve100 to 100,
+            R.id.achieve150 to 150,
+            R.id.achieve200 to 200,
+            R.id.achieve250 to 250,
+            R.id.achieve300 to 300,
+            R.id.achieve365 to 365,
+            R.id.achieve500 to 500,
+            R.id.achieve1000 to 1000
+        )
 
-        // Update Shop UI
+        for ((viewId, requiredStreak) in achievementTiers) {
+            val achieveView = findViewById<View>(viewId)
+            if (achieveView != null) {
+                achieveView.alpha = if (maxStreak >= requiredStreak) 1.0f else 0.3f
+            }
+        }
+
         findViewById<Button>(R.id.btnShop).text = "🪙 $totalCoins | SHOP"
 
-        // --- CONFETTI BURST ---
+        // Visual Confetti Burst (No SFX)
         val confetti = findViewById<ConfettiView>(R.id.confettiView)
         confetti?.burst()
 
@@ -443,10 +518,14 @@ class MainActivity : AppCompatActivity() {
         }
         layout.addView(titleText)
 
+        // Make sure there are no accidental spaces in your hex codes!
         val items = listOf(
             Triple("Classic Pink", "#E91E63", 0),
             Triple("Neon Green", "#00E676", 150),
-            Triple("Electric Blue", "#00E5FF", 300)
+            Triple("Electric Blue", "#00E5FF", 300),
+            Triple("Sunset (Gradient)", "#FF512F,#DD2476", 500),
+            Triple("Oceanic (Gradient)", "#2193b0,#6dd5ed", 500),
+            Triple("Cyberpunk (Gradient)", "#8A2387,#E94057,#F27121", 800)
         )
 
         var dialog: androidx.appcompat.app.AlertDialog? = null
@@ -457,14 +536,30 @@ class MainActivity : AppCompatActivity() {
             val isEquipped = equippedColor == hex
 
             val itemButton = com.google.android.material.button.MaterialButton(this).apply {
+                layoutParams = android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { setMargins(0, 0, 0, 16) }
+
                 text = when {
                     isEquipped -> "$name (EQUIPPED)"
                     isOwned -> "$name (OWNED)"
                     else -> "$name - $cost 🪙"
                 }
 
-                backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor(hex))
-                setTextColor(if (hex == "#00E676" || hex == "#00E5FF") android.graphics.Color.BLACK else android.graphics.Color.WHITE)
+                if (hex.contains(",")) {
+                    val colorInts = hex.split(",").map { android.graphics.Color.parseColor(it.trim()) }.toIntArray()
+                    val gd = android.graphics.drawable.GradientDrawable(
+                        android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT, colorInts
+                    )
+                    gd.cornerRadius = 60f
+                    background = gd
+                    backgroundTintList = null
+                    setTextColor(android.graphics.Color.WHITE)
+                } else {
+                    backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor(hex.trim()))
+                    setTextColor(if (hex.trim() == "#00E676" || hex.trim() == "#00E5FF") android.graphics.Color.BLACK else android.graphics.Color.WHITE)
+                }
 
                 setOnClickListener {
                     if (isOwned) {
@@ -481,11 +576,13 @@ class MainActivity : AppCompatActivity() {
                             .putString("EQUIPPED_COLOR", hex)
                             .apply()
 
-                        findViewById<Button>(R.id.btnShop).text = "🪙 $totalCoins | SHOP"
+                        // THE FIX: Properly scoping the UI update to the Activity!
+                        this@MainActivity.findViewById<Button>(R.id.btnShop).text = "🪙 $totalCoins | SHOP"
+
                         puzzleBoard.setPathColor(hex)
                         dialog?.dismiss()
                     } else {
-                        android.widget.Toast.makeText(context, "Need more coins!", android.widget.Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@MainActivity, "Need more coins!", Toast.LENGTH_SHORT).show()
                     }
                 }
             }
@@ -534,7 +631,6 @@ class MainActivity : AppCompatActivity() {
             strokeWidth = 3
             elevation = 0f
             setTextColor(android.graphics.Color.parseColor("#E91E63"))
-
             setOnClickListener { showAboutDialog() }
         }
 
@@ -544,7 +640,6 @@ class MainActivity : AppCompatActivity() {
             elevation = 0f
             strokeWidth = 0
             setTextColor(android.graphics.Color.parseColor("#E91E63"))
-
             setOnClickListener { showPrivacyDialog() }
         }
 
@@ -567,10 +662,8 @@ class MainActivity : AppCompatActivity() {
             
             Developed by:
             TECHNICK-TN
-            
-            TECHNICK-TN is a passionate full-stack developer, tech creator, and MCA student at Charusat University, based in Morbi, Gujarat. 
-            
-            Specializing in everything from sleek UI design and Flutter development to complex Machine Learning and IoT integrations, this game was built to challenge your brain with modern, satisfying puzzle mechanics.
+           
+            Specializing in everything from sleek UI design and Android development to complex Machine Learning and IoT integrations, this game was built to challenge your brain with modern, satisfying puzzle mechanics.
         """.trimIndent()
 
         com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
